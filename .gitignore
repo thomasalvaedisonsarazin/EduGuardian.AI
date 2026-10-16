@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+node_modules/
+dist/
+.coverage
+htmlcov/
+data/
+*.xlsx
+*.csv
+!backend/app/seed/**/*.csv
