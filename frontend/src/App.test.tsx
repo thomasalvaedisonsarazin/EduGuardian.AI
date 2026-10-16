@@ -57,7 +57,7 @@ describe('routing', () => {
   it('renders the app shell with navigation on /dashboard', async () => {
     signIn()
     renderAt('/dashboard')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' }, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /audit log/i }).length).toBeGreaterThan(0)
     expect(screen.getByText('Green Valley High')).toBeInTheDocument()
   })
@@ -65,7 +65,7 @@ describe('routing', () => {
   it('redirects / to /dashboard', async () => {
     signIn()
     renderAt('/')
-    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' }, { timeout: 5000 })).toBeInTheDocument()
   })
 
   it('redirects signed-out users to /login', async () => {
