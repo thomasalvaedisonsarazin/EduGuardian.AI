@@ -1,13 +1,47 @@
+# --- Python ---
 venv/
 .venv/
+backend/.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Secrets (never commit a real .env) ---
 .env
+.env.*
+!.env.example
+
+# --- Node / frontend ---
 node_modules/
 dist/
+.vite/
+npm-debug.log*
+
+# --- Coverage ---
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
+coverage/
+
+# --- Local data ---
 data/
+*.db
+*.sqlite3
+
+# --- Editors / OS ---
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Spreadsheets: ignored, except seed data and test fixtures ---
 *.xlsx
 *.csv
 !backend/app/seed/**/*.csv
+!backend/app/seed/**/*.xlsx
+!backend/tests/fixtures/**/*.csv
+!backend/tests/fixtures/**/*.xlsx

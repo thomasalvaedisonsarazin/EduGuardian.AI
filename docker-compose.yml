@@ -1,0 +1,68 @@
+# EduGuardian AI - production-like stack.
+#   docker compose up -d --build
+# Frontend: http://localhost:3000   Backend: http://localhost:8000 (/health, /docs)
+# NOTE: the db port is intentionally NOT published (host 5432 is used by eduguardian-dev-db).
+name: eduguardian
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-edu}:${POSTGRES_PASSWORD:-edu}@db:5432/${POSTGRES_DB:-eduguardian}
+  SECRET_KEY: ${SECRET_KEY:-change-me}
+  ALGORITHM: ${ALGORITHM:-HS256}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+  REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-["http://localhost:3000","http://localhost:5173"]}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+  LLM_ENABLED: ${LLM_ENABLED:-false}
+  LLM_MONTHLY_BUDGET_USD: ${LLM_MONTHLY_BUDGET_USD:-15}
+  REPORTS_DIR: /data/reports
+  UPLOADS_DIR: /data/uploads
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-edu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-edu}
+      POSTGRES_DB: ${POSTGRES_DB:-eduguardian}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    image: eduguardian-backend:latest
+    restart: unless-stopped
+    environment: *backend-env
+    volumes:
+      - appdata:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    image: eduguardian-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  appdata:
