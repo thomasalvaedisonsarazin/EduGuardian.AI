@@ -1,4 +1,5 @@
 """Alembic environment. URL resolution: $DATABASE_URL -> app.config.settings -> dev default."""
+
 import os
 from logging.config import fileConfig
 

@@ -27,3 +27,6 @@ ignore_missing_imports = true
 plugins = ["pydantic.mypy"]
 warn_unused_ignores = true
 check_untyped_defs = true
+
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]

@@ -110,3 +110,27 @@ def health_db() -> JSONResponse:
 # Phase 2 agents: import routers and register them here, e.g.
 #   from app.routers import auth
 #   app.include_router(auth.router, prefix="/api/v1")
+from app.routers import (  # noqa: E402
+    agent_runs,
+    analytics,
+    audit,
+    auth,
+    imports,
+    interventions,
+    reports,
+    schools,
+    setup,
+)
+
+for _module in (
+    auth,
+    schools,
+    setup,
+    imports,
+    analytics,
+    agent_runs,
+    interventions,
+    audit,
+    reports,
+):
+    app.include_router(_module.router, prefix="/api/v1")
