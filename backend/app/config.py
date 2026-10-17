@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     UPLOADS_DIR: str = "./data/uploads"
     MAX_UPLOAD_MB: int = 5
 
+    # --- Module 5: LLM cost control & agent runs ---
+    # USD per 1M tokens for OPENAI_MODEL. Defaults match gpt-4o-mini list prices at the time of
+    # writing - they MUST be checked against current OpenAI pricing before going live.
+    LLM_INPUT_PRICE_PER_MTOK: float = 0.15
+    LLM_OUTPUT_PRICE_PER_MTOK: float = 0.60
+    LLM_TIMEOUT_SECONDS: float = 30.0
+    LLM_MAX_RETRIES: int = 1
+    LLM_MAX_OUTPUT_TOKENS: int = 4000
+    LLM_BATCH_SIZE: int = 8  # at-risk students per intervention-drafting LLM call
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT.lower() in {"production", "prod"}
