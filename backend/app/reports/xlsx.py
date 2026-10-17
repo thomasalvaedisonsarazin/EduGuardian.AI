@@ -161,6 +161,26 @@ class _SheetWriter:
             self.ws.column_dimensions[get_column_letter(col)].width = width
 
 
+def neutralize_formulas(wb: Workbook) -> int:
+    """Store every formula-looking cell as plain text (Excel formula injection guard).
+
+    openpyxl turns any string starting with ``=`` into a live formula. Reports contain
+    user-controlled text (student names, plan text, exam/subject names), and the workbook never
+    contains intentional cell formulas (conditional formatting uses rules), so every ``f`` cell
+    is downgraded to a string. Returns the number of neutralized cells.
+    """
+    count = 0
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
+                    count += 1
+    if count:
+        logger.warning("Neutralized %d formula-like cell(s) in an XLSX report", count)
+    return count
+
+
 def render_xlsx(content: ReportContent, path: Path) -> None:
     """Write ``content`` as an .xlsx workbook to ``path``."""
     wb = Workbook()
@@ -209,5 +229,6 @@ def render_xlsx(content: ReportContent, path: Path) -> None:
     )
     wb.properties.title = content.title
     wb.properties.creator = "EduGuardian AI"
+    neutralize_formulas(wb)
     wb.save(path)
     logger.info("XLSX report written: %s (%d bytes)", path, path.stat().st_size)

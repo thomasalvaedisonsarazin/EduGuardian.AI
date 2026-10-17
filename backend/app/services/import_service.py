@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.agents import data_quality as dq
 from app.config import settings
 from app.dependencies import TenantContext
-from app.exceptions import ConflictError, DomainValidationError, NotFoundError
+from app.exceptions import ConflictError, DomainValidationError, ForbiddenError, NotFoundError
 from app.models import (
     ClassSection,
     Exam,
@@ -29,8 +29,11 @@ from app.models import (
     ImportBatch,
     ImportStatus,
     Mark,
+    MembershipRole,
     Student,
     Subject,
+    Teacher,
+    TeachingAssignment,
 )
 from app.schemas.imports import (
     ColumnMapOut,
@@ -72,6 +75,70 @@ def get_batch(db: Session, school_id: int, batch_id: int) -> ImportBatch:
     if batch is None:
         raise NotFoundError("Import batch")
     return batch
+
+
+# --- teacher scope -------------------------------------------------------------------------
+def is_restricted_teacher(ctx: TenantContext) -> bool:
+    """Teachers may only see their own batches and write marks for what they teach."""
+    return ctx.role == MembershipRole.teacher and not getattr(ctx.user, "is_superadmin", False)
+
+
+def teacher_assignment_pairs(db: Session, ctx: TenantContext) -> set[tuple[int, int]]:
+    """``(class_section_id, subject_id)`` pairs the caller teaches in the active school."""
+    rows = db.execute(
+        select(TeachingAssignment.class_section_id, TeachingAssignment.subject_id)
+        .join(Teacher, Teacher.id == TeachingAssignment.teacher_id)
+        .where(
+            Teacher.user_id == ctx.user.id,
+            Teacher.school_id == ctx.school_id,
+            TeachingAssignment.school_id == ctx.school_id,
+        )
+    ).all()
+    return {(int(section_id), int(subject_id)) for section_id, subject_id in rows}
+
+
+def get_visible_batch(db: Session, ctx: TenantContext, batch_id: int) -> ImportBatch:
+    """Tenant-scoped batch; teachers only see batches they uploaded (others -> 404)."""
+    batch = get_batch(db, ctx.school_id, batch_id)
+    if is_restricted_teacher(ctx) and batch.uploaded_by != ctx.user.id:
+        raise NotFoundError("Import batch")
+    return batch
+
+
+def _check_teacher_write_scope(
+    db: Session, ctx: TenantContext, rows: list[dict[str, Any]], allowed_subjects: set[int]
+) -> None:
+    """403 when a teacher's import would write marks outside their teaching assignments."""
+    if not is_restricted_teacher(ctx):
+        return
+    pairs = teacher_assignment_pairs(db, ctx)
+    student_ids = {int(r["student_id"]) for r in rows if r.get("student_id") is not None}
+    sections = dict(
+        db.execute(
+            select(Student.id, Student.class_section_id).where(
+                Student.school_id == ctx.school_id, Student.id.in_(student_ids)
+            )
+        ).all()
+    )
+    outside = 0
+    for row in rows:
+        student_id = row.get("student_id")
+        if student_id is None:
+            continue
+        section_id = sections.get(int(student_id))
+        for cell in (row.get("marks") or {}).values():
+            subject_id = int(cell["subject_id"])
+            if subject_id not in allowed_subjects:
+                continue
+            if not cell.get("is_absent") and cell.get("value") is None:
+                continue  # blank cells are never written
+            if (section_id, subject_id) not in pairs:
+                outside += 1
+    if outside:
+        raise ForbiddenError(
+            f"You can only import marks for the classes and subjects you teach "
+            f"({outside} mark(s) are outside your teaching assignments)"
+        )
 
 
 def exam_subjects(db: Session, school_id: int, exam_id: int) -> list[ExamSubject]:
@@ -218,7 +285,7 @@ def upload(
 def update_mapping(
     db: Session, ctx: TenantContext, batch_id: int, payload: ColumnMapUpdate
 ) -> ImportBatchDetail:
-    batch = get_batch(db, ctx.school_id, batch_id)
+    batch = get_visible_batch(db, ctx, batch_id)
     if batch.status not in (ImportStatus.uploaded, ImportStatus.validated):
         raise ConflictError(f"Cannot change the mapping of a {batch.status.value} import")
     exam = get_exam(db, ctx.school_id, batch.exam_id)
@@ -266,7 +333,7 @@ def update_mapping(
 
 # --- commit / reject -----------------------------------------------------------------------
 def commit(db: Session, ctx: TenantContext, batch_id: int) -> CommitResult:
-    batch = get_batch(db, ctx.school_id, batch_id)
+    batch = get_visible_batch(db, ctx, batch_id)
     if batch.status != ImportStatus.validated:
         raise ConflictError(
             f"Only validated imports can be committed (status: {batch.status.value})"
@@ -291,6 +358,7 @@ def commit(db: Session, ctx: TenantContext, batch_id: int) -> CommitResult:
     )
     if valid_students != student_ids:
         raise ConflictError("Some students changed since validation - re-validate the import")
+    _check_teacher_write_scope(db, ctx, rows, allowed_subjects)
 
     existing = {
         (m.student_id, m.subject_id): m
@@ -359,7 +427,7 @@ def commit(db: Session, ctx: TenantContext, batch_id: int) -> CommitResult:
 
 
 def reject(db: Session, ctx: TenantContext, batch_id: int) -> ImportBatchDetail:
-    batch = get_batch(db, ctx.school_id, batch_id)
+    batch = get_visible_batch(db, ctx, batch_id)
     if batch.status == ImportStatus.committed:
         raise ConflictError("A committed import cannot be rejected")
     if batch.status != ImportStatus.rejected:
@@ -418,7 +486,7 @@ def build_detail(db: Session, batch: ImportBatch, exam: Exam) -> ImportBatchDeta
 
 
 def get_detail(db: Session, ctx: TenantContext, batch_id: int) -> ImportBatchDetail:
-    batch = get_batch(db, ctx.school_id, batch_id)
+    batch = get_visible_batch(db, ctx, batch_id)
     return build_detail(db, batch, get_exam(db, ctx.school_id, batch.exam_id))
 
 
@@ -434,6 +502,8 @@ def list_batches(
     )
     if exam_id is not None:
         stmt = stmt.where(ImportBatch.exam_id == exam_id)
+    if is_restricted_teacher(ctx):
+        stmt = stmt.where(ImportBatch.uploaded_by == ctx.user.id)
     return [
         ImportBatchListItem(
             id=batch.id,

@@ -7,6 +7,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logger = logging.getLogger(__name__)
 
 DEV_SECRET_KEY = "dev-insecure-secret-key-change-me"  # dev default only; override via env
+#: Placeholder keys shipped in .env.example / docker-compose; never acceptable in production.
+KNOWN_WEAK_SECRET_KEYS = frozenset({DEV_SECRET_KEY, "change-me", "your-secret-key", "secret"})
+MIN_SECRET_KEY_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -64,10 +67,25 @@ class Settings(BaseSettings):
         """True only when the LLM is enabled AND an API key is configured."""
         return self.LLM_ENABLED and bool(self.OPENAI_API_KEY)
 
+    @property
+    def secret_key_is_weak(self) -> bool:
+        key = self.SECRET_KEY.strip()
+        return key in KNOWN_WEAK_SECRET_KEYS or len(key) < MIN_SECRET_KEY_LENGTH
+
     def warn_insecure_defaults(self) -> None:
-        """Log a warning for unsafe configuration (called at app startup)."""
-        if self.SECRET_KEY == DEV_SECRET_KEY and self.is_production:
-            logger.warning("SECRET_KEY is the development default in production - set it!")
+        """Check for unsafe configuration (called at app startup).
+
+        A weak/placeholder SECRET_KEY lets anyone forge access tokens for any user, so it is a
+        hard error in production and a warning elsewhere.
+        """
+        if not self.secret_key_is_weak:
+            return
+        if self.is_production:
+            raise RuntimeError(
+                "SECRET_KEY is a placeholder or shorter than "
+                f"{MIN_SECRET_KEY_LENGTH} characters - refusing to start in production"
+            )
+        logger.warning("SECRET_KEY is weak or a placeholder - set a strong value before deploying")
 
 
 settings = Settings()

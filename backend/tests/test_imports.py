@@ -26,6 +26,8 @@ from app.models import (
     MembershipRole,
     Student,
     Subject,
+    Teacher,
+    TeachingAssignment,
 )
 
 ClientFactory = Callable[[TenantContext], TestClient]
@@ -112,6 +114,23 @@ def test_upload_validate_commit_flow(
 ) -> None:
     ctx = make_tenant(MembershipRole.teacher)
     s = make_setup(db, ctx.school_id)
+    # Teachers may only write marks for the classes/subjects they teach (8-A here).
+    teacher = Teacher(school_id=ctx.school_id, user_id=ctx.user.id, full_name="T One")
+    db.add(teacher)
+    db.flush()
+    section_a = s.students["A001"].class_section_id
+    db.add_all(
+        [
+            TeachingAssignment(
+                school_id=ctx.school_id,
+                teacher_id=teacher.id,
+                class_section_id=section_a,
+                subject_id=subject.id,
+            )
+            for subject in (s.maths, s.science)
+        ]
+    )
+    db.flush()
     client = client_as(ctx)
 
     res = upload(client, s.exam.id, GOOD_CSV)
