@@ -1,162 +1,46 @@
-# MicroSaaS Template
+# EduGuardian AI
 
-> **Clone. Define. Build.** Full-stack SaaS in minutes.
+Multi-tenant, multi-agent academic intelligence platform: upload marks → Data Quality Agent validates →
+deterministic analytics finds students needing support → Intervention Agent drafts plans → teachers
+approve → Reporting Agent produces PDF/Excel reports. Every step is audit-logged.
 
----
+Spec: `EduGuardian_AI_Project_Idea.md` · Product definition: `INITIAL.md` · Blueprint: `PRPs/eduguardian-ai-prp.md`
 
-## Quick Start
-
-```bash
-# 1. Clone
-git clone https://github.com/manojkanur/MicroSaaS-Template-Private.git my-saas
-cd my-saas
-
-# 2. Define your product
-# Edit INITIAL.md with your product details
-
-# 3. Generate blueprint
-/generate-prp INITIAL.md
-
-# 4. Build with parallel agents
-/execute-prp PRPs/[name]-prp.md
-```
-
----
-
-## What You Get
-
-- FastAPI backend with JWT + Google OAuth
-- React frontend with modern UI (Framer Motion)
-- PostgreSQL database with migrations
-- Docker + CI/CD ready
-- 80%+ test coverage
-
----
-
-## How It Works
-
-```
-INITIAL.md → /generate-prp → PRP blueprint → /execute-prp → Full App
-
-Phase 1 (Parallel):
-├─ DATABASE-AGENT  → Models + migrations
-├─ BACKEND-AGENT   → API structure
-├─ FRONTEND-AGENT  → React setup
-└─ DEVOPS-AGENT    → Docker + CI
-
-Phase 2 (Per Module):
-├─ Backend endpoints
-└─ Frontend pages
-
-Phase 3 (Parallel):
-├─ TEST-AGENT      → 80%+ coverage
-└─ REVIEW-AGENT    → Security audit
-```
-
----
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `INITIAL.md` | Define your product |
-| `CLAUDE.md` | Project rules |
-| `skills/*.md` | Code patterns (5 files) |
-| `agents/*.md` | Agent definitions |
-| `.claude/commands/` | Custom commands |
-
----
-
-## Skills (5 files)
-
-| Skill | Contains |
-|-------|----------|
-| `BACKEND.md` | FastAPI + JWT + OAuth + Errors |
-| `FRONTEND.md` | React + UI Kit + API integration |
-| `DATABASE.md` | SQLAlchemy + Alembic |
-| `TESTING.md` | pytest + Vitest |
-| `DEPLOYMENT.md` | Docker + GitHub Actions |
-
----
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `/setup-project` | Interactive wizard |
-| `/generate-prp` | Create implementation blueprint |
-| `/execute-prp` | Build with parallel agents |
-
----
-
-## Tech Stack
-
-- **Backend:** FastAPI + Python 3.11+
-- **Frontend:** React + TypeScript + Vite
-- **Database:** PostgreSQL + SQLAlchemy
-- **Auth:** JWT + Google OAuth
-- **UI:** Chakra UI or Tailwind + Framer Motion
-- **Deploy:** Docker + GitHub Actions
-
----
-
-## Example
+## Run (Docker)
 
 ```bash
-# Define an invoice SaaS in INITIAL.md:
-# - Module: Invoices (CRUD)
-# - Module: Clients (CRUD)
-# - Module: Dashboard
-
-/generate-prp INITIAL.md
-# Creates PRPs/invoice-saas-prp.md
-
-/execute-prp PRPs/invoice-saas-prp.md
-# 4 agents build in parallel
-# ~20-30 minutes for complete app
+cp .env.example .env            # then set SECRET_KEY (32+ chars); optional OPENAI_API_KEY + LLM_ENABLED=true
+docker compose up -d --build
+docker compose exec backend python -m app.seed            # demo school (add --reset to start fresh)
 ```
 
----
+- App: http://localhost:3000 — login `demo@eduguardian.test` / `Demo@12345` (teacher: `teacher@eduguardian.test`)
+- API docs: http://localhost:8000/docs
 
-## Output Structure
+Dev mode with hot reload: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up` (Vite on :5173, Postgres on :5433).
 
-```
-my-saas/
-├── backend/
-│   ├── app/
-│   │   ├── main.py
-│   │   ├── models/
-│   │   ├── routers/
-│   │   ├── services/
-│   │   └── auth/
-│   ├── alembic/
-│   └── tests/
-├── frontend/
-│   └── src/
-│       ├── components/
-│       ├── pages/
-│       ├── hooks/
-│       └── services/
-├── docker-compose.yml
-└── .github/workflows/
-```
+## Demo script
 
----
+1. **Import Marks** → upload `backend/app/seed/sample_marks_with_errors.csv` to see the Data Quality Agent block it;
+   then `sample_marks_quarterly_10A.csv` → commit.
+2. **Dashboard / Analytics** → Quarterly Exam: pass rates, weak subjects, at-risk students with evidence.
+3. **AI Agents** → run on Quarterly Exam and watch the 5 agents complete.
+4. **Interventions** → review, edit, approve or reject the drafted plans.
+5. **Reports** → download the principal PDF/Excel; **Audit Log** shows every agent and human action.
 
-## Run Locally
+With `LLM_ENABLED=false` (default) plans are drafted from deterministic templates at zero cost. With an OpenAI
+key, plans are LLM-drafted from pseudonymous data only (no names/admission numbers — enforced and tested) under a
+monthly budget cap (`LLM_MONTHLY_BUDGET_USD`).
+
+## Tests
 
 ```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-
-# Docker
-docker-compose up -d
+cd backend && pytest --cov=app        # needs Postgres; see tests/conftest.py (TEST_DATABASE_URL)
+cd frontend && npm test && npm run type-check && npm run lint
 ```
+
+## Known follow-ups (from the security review)
+
+Upload row caps · per-account login rate limit with a shared store · global LLM spend cap · CSV-safe template
+output · SQL-side report filtering · audit-log composite index (migration) · teacher read scope for analytics ·
+httpOnly refresh cookie. Verify `LLM_INPUT/OUTPUT_PRICE_PER_MTOK` against current OpenAI pricing.
