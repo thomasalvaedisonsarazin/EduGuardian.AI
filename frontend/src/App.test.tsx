@@ -25,7 +25,7 @@ function renderAt(path: string) {
 }
 
 function signIn() {
-  setTokens({ access_token: 'acc', refresh_token: 'ref' })
+  setTokens({ access_token: 'acc' })
 }
 
 beforeEach(() => {

@@ -113,6 +113,16 @@ def month_spend(db: Session, school_id: int, now: datetime | None = None) -> Dec
     return Decimal(str(total or 0))
 
 
+def global_month_spend(db: Session, now: datetime | None = None) -> Decimal:
+    """Sum of ``AgentRun.cost_usd`` across every school in the current calendar month (UTC)."""
+    now = now or datetime.now(UTC)
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    total = db.scalar(
+        select(func.coalesce(func.sum(AgentRun.cost_usd), 0)).where(AgentRun.created_at >= start)
+    )
+    return Decimal(str(total or 0))
+
+
 class LLMClient:
     """Budget-capped OpenAI client for one school (one instance per agent run)."""
 
@@ -162,6 +172,16 @@ class LLMClient:
             raise BudgetExceededError(
                 f"Monthly LLM budget of ${self.config.LLM_MONTHLY_BUDGET_USD:.2f} would be "
                 "exceeded; using deterministic templates instead"
+            )
+        global_budget = Decimal(str(self.config.LLM_GLOBAL_MONTHLY_BUDGET_USD))
+        global_remaining = global_budget - global_month_spend(self.db) - self.spent
+        if estimated > global_remaining:
+            logger.warning(
+                "Global LLM budget exceeded: estimated=%s remaining=%s", estimated, global_remaining
+            )
+            raise BudgetExceededError(
+                "The service-wide monthly LLM budget would be exceeded; "
+                "using deterministic templates instead"
             )
 
     def _sdk_client(self) -> Any:

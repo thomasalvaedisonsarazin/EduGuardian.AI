@@ -161,3 +161,29 @@ def test_client_wraps_sdk_errors(db: Session, school: School) -> None:
     )
     with pytest.raises(LLMUnavailable):
         client.complete_json(system="s", user="u")
+
+
+def test_client_enforces_global_budget_across_schools(db: Session, school: School) -> None:
+    other = School(name="Other School", code="LLM02")
+    db.add(other)
+    db.flush()
+    db.add(
+        AgentRun(
+            school_id=other.id,
+            kind=AgentRunKind.full_analysis,
+            status=AgentRunStatus.done,
+            cost_usd=Decimal("0.9999"),
+        )
+    )
+    db.flush()
+    assert month_spend(db, school.id) == Decimal(0)
+    completions = FakeCompletions("{}")
+    client = LLMClient(
+        db,
+        school.id,
+        config=cfg(LLM_MONTHLY_BUDGET_USD=100.0, LLM_GLOBAL_MONTHLY_BUDGET_USD=1.0),
+        sdk_client=fake_sdk(completions),
+    )
+    with pytest.raises(BudgetExceededError):
+        client.complete_json(system="s" * 4000, user="u")
+    assert completions.calls == []

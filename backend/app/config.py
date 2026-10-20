@@ -39,10 +39,18 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     LLM_ENABLED: bool = False
     LLM_MONTHLY_BUDGET_USD: float = 15.0
+    #: Hard cap on LLM spend across ALL schools this calendar month (protects the API key owner).
+    LLM_GLOBAL_MONTHLY_BUDGET_USD: float = 20.0
+
+    #: When false, POST /auth/register is refused (public demo: only seeded accounts can log in).
+    ALLOW_REGISTRATION: bool = True
 
     REPORTS_DIR: str = "./data/reports"
     UPLOADS_DIR: str = "./data/uploads"
     MAX_UPLOAD_MB: int = 5
+    MAX_IMPORT_ROWS: int = 5000
+
+    REFRESH_COOKIE_NAME: str = "eg_refresh"
 
     # --- Module 5: LLM cost control & agent runs ---
     # USD per 1M tokens for OPENAI_MODEL. Defaults match gpt-4o-mini list prices at the time of

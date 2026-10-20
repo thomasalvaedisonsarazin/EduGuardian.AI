@@ -303,6 +303,7 @@ def parse_marks_file(content: bytes, filename: str) -> ParsedSheet:
                 dtype=str,
                 keep_default_na=False,
                 engine="openpyxl",
+                nrows=settings.MAX_IMPORT_ROWS + 1,
             )
     except DomainValidationError:
         raise
@@ -312,6 +313,12 @@ def parse_marks_file(content: bytes, filename: str) -> ParsedSheet:
             "Could not read the file - check that it is a valid CSV or Excel sheet",
             code="UNREADABLE_FILE",
         ) from exc
+
+    if len(frame) > settings.MAX_IMPORT_ROWS:
+        raise DomainValidationError(
+            f"The file has more than {settings.MAX_IMPORT_ROWS} rows - split it into smaller files",
+            code="TOO_MANY_ROWS",
+        )
 
     headers = [_clean_cell(h) for h in frame.columns]
     rows = [[_clean_cell(v) for v in record] for record in frame.itertuples(index=False)]
@@ -341,6 +348,7 @@ def _read_csv(content: bytes) -> pd.DataFrame:
                 keep_default_na=False,
                 encoding=encoding,
                 skipinitialspace=True,
+                nrows=settings.MAX_IMPORT_ROWS + 1,
             )
         except UnicodeDecodeError:
             continue

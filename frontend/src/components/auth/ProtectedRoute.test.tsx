@@ -60,7 +60,7 @@ function renderAt(path: string, roles?: readonly Role[]) {
 }
 
 function signIn() {
-  setTokens({ access_token: 'acc', refresh_token: 'ref' })
+  setTokens({ access_token: 'acc' })
   setActiveSchoolId(5)
 }
 

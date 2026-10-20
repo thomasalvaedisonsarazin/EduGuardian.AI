@@ -48,11 +48,13 @@ class LoginRequest(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(min_length=1, max_length=512)
+    """The refresh token may come in the body or (browsers) in the httpOnly refresh cookie."""
+
+    refresh_token: str | None = Field(default=None, min_length=1, max_length=512)
 
 
 class LogoutRequest(BaseModel):
-    refresh_token: str = Field(min_length=1, max_length=512)
+    refresh_token: str | None = Field(default=None, min_length=1, max_length=512)
 
 
 class TokenPair(BaseModel):

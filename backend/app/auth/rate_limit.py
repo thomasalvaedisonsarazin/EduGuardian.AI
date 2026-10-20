@@ -52,9 +52,16 @@ class RateLimiter:
 
 
 auth_rate_limiter = RateLimiter(limit=10, window_seconds=60.0)
+#: Per-account login limit, so one account can't be brute-forced from many IPs.
+login_account_limiter = RateLimiter(limit=10, window_seconds=15 * 60.0)
 
 
 def rate_limit_auth(request: Request) -> None:
     """FastAPI dependency: 10 requests/minute per client IP per auth endpoint."""
     client_ip = request.client.host if request.client else "unknown"
     auth_rate_limiter.hit(f"{request.url.path}:{client_ip}")
+
+
+def rate_limit_login_account(email: str) -> None:
+    """10 login attempts per 15 minutes per account (email), whatever the client IP."""
+    login_account_limiter.hit(f"login:{email.strip().lower()}")

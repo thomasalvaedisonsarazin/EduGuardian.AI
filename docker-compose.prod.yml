@@ -1,0 +1,37 @@
+# EduGuardian AI - internet-facing overrides (use on the server, never locally):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Caddy is the only service with public ports; it gets HTTPS certificates automatically for
+# $DOMAIN and routes /api/* to the backend and everything else to the frontend (same origin).
+# See DEPLOY.md.
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    ports: !reset []
+
+  frontend:
+    ports: !reset []
+    build:
+      args:
+        # Empty = call the API on the same origin (https://DOMAIN/api/v1).
+        VITE_API_URL: ""
+
+volumes:
+  caddy_data:
+  caddy_config:

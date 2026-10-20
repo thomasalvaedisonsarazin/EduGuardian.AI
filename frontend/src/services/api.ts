@@ -7,13 +7,7 @@
  * - `ApiError.from(err)` normalises backend errors shaped `{"error": {"code", "message"}}`.
  */
 import axios, { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
-import {
-  clearSession,
-  getAccessToken,
-  getActiveSchoolId,
-  getRefreshToken,
-  setTokens,
-} from '@/lib/storage'
+import { clearSession, getAccessToken, getActiveSchoolId, setTokens } from '@/lib/storage'
 import type { ApiErrorBody, JsonValue, TokenPair } from '@/types'
 
 export const API_ORIGIN: string = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/+$/, '')
@@ -32,6 +26,8 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { Accept: 'application/json' },
   timeout: 30_000,
+  // Sends/receives the httpOnly refresh cookie when the API is on another origin (local dev).
+  withCredentials: true,
 })
 
 api.interceptors.request.use((config) => {
@@ -46,14 +42,12 @@ api.interceptors.request.use((config) => {
 
 let refreshPromise: Promise<string | null> | null = null
 
-/** Exchanges the stored refresh token for a new pair. Resolves the new access token or null. */
+/** Exchanges the refresh cookie for a new pair. Resolves the new access token or null. */
 export function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) return refreshPromise
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) return Promise.resolve(null)
 
   refreshPromise = axios
-    .post<TokenPair>(`${API_BASE_URL}/auth/refresh`, { refresh_token: refreshToken }, { timeout: 15_000 })
+    .post<TokenPair>(`${API_BASE_URL}/auth/refresh`, null, { timeout: 15_000, withCredentials: true })
     .then(({ data }) => {
       setTokens(data)
       return data.access_token

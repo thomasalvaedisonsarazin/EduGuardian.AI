@@ -1,0 +1,30 @@
+# EduGuardian AI - public entry point. Caddy obtains and renews the HTTPS certificate itself.
+# Caddy ignores X-Forwarded-For sent by clients and sets it to the real client IP, which the
+# backend's login rate limits rely on.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	request_body {
+		max_size 10MB
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle /health {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

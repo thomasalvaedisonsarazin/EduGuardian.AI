@@ -1,5 +1,7 @@
 /**
- * Session storage for auth tokens and the active school.
+ * Session storage for the short-lived access token and the active school.
+ * The refresh token is never stored here: the backend keeps it in an httpOnly cookie that
+ * page scripts cannot read.
  * Every localStorage access is wrapped in try/catch: storage can be unavailable
  * (private mode, blocked site data) and the app must still render.
  */
@@ -7,7 +9,8 @@ import type { ID, TokenPair } from '@/types'
 
 const KEYS = {
   access: 'eg.access_token',
-  refresh: 'eg.refresh_token',
+  /** Legacy key from before the refresh cookie; only ever removed. */
+  legacyRefresh: 'eg.refresh_token',
   school: 'eg.active_school_id',
 } as const
 
@@ -43,19 +46,15 @@ export function getAccessToken(): string | null {
   return read(KEYS.access)
 }
 
-export function getRefreshToken(): string | null {
-  return read(KEYS.refresh)
-}
-
-export function setTokens(tokens: Pick<TokenPair, 'access_token' | 'refresh_token'>): void {
+export function setTokens(tokens: Pick<TokenPair, 'access_token'>): void {
   write(KEYS.access, tokens.access_token)
-  write(KEYS.refresh, tokens.refresh_token)
+  write(KEYS.legacyRefresh, null)
   notify()
 }
 
 export function clearTokens(): void {
   write(KEYS.access, null)
-  write(KEYS.refresh, null)
+  write(KEYS.legacyRefresh, null)
   notify()
 }
 
@@ -74,7 +73,7 @@ export function setActiveSchoolId(id: ID | null): void {
 /** Clears tokens and active school (logout / failed refresh). */
 export function clearSession(): void {
   write(KEYS.access, null)
-  write(KEYS.refresh, null)
+  write(KEYS.legacyRefresh, null)
   write(KEYS.school, null)
   notify()
 }

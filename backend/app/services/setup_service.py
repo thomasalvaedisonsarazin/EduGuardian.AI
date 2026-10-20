@@ -7,6 +7,7 @@ Deletes use bulk ``DELETE`` statements so the database's ``ON DELETE CASCADE`` r
 
 import csv
 import io
+import itertools
 import logging
 import re
 from collections.abc import Iterable, Sequence
@@ -17,6 +18,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.exceptions import ConflictError, DomainValidationError, NotFoundError
 from app.models import (
     AcademicYear,
@@ -680,6 +682,7 @@ def _cell_str(value: object) -> str:
 def parse_tabular(content: bytes, filename: str) -> list[dict[str, str]]:
     """Parse CSV or XLSX bytes into rows keyed by normalised header (lowercase, snake_case)."""
     name = (filename or "").lower()
+    max_rows = settings.MAX_IMPORT_ROWS
     raw_rows: list[list[object]]
     if name.endswith((".xlsx", ".xlsm")):
         from openpyxl import load_workbook
@@ -689,19 +692,24 @@ def parse_tabular(content: bytes, filename: str) -> list[dict[str, str]]:
         except Exception as exc:  # openpyxl raises many types for bad files
             raise DomainValidationError("Could not read the Excel file") from exc
         ws = wb.worksheets[0]
-        raw_rows = [list(r) for r in ws.iter_rows(values_only=True)]
+        raw_rows = [list(r) for r in ws.iter_rows(values_only=True, max_row=max_rows + 2)]
         wb.close()
     elif name.endswith(".csv") or not name:
         try:
             text = content.decode("utf-8-sig")
         except UnicodeDecodeError:
             text = content.decode("latin-1")
-        raw_rows = [list(r) for r in csv.reader(io.StringIO(text))]
+        raw_rows = [list(r) for r in itertools.islice(csv.reader(io.StringIO(text)), max_rows + 2)]
     else:
         raise DomainValidationError("Unsupported file type; upload a .csv or .xlsx file")
 
     if not raw_rows:
         raise DomainValidationError("The file is empty")
+    if len(raw_rows) - 1 > max_rows:
+        raise DomainValidationError(
+            f"The file has more than {max_rows} rows - split it into smaller files",
+            code="TOO_MANY_ROWS",
+        )
     headers = [_norm_header(h) for h in raw_rows[0]]
     rows: list[dict[str, str]] = []
     for raw in raw_rows[1:]:

@@ -39,8 +39,16 @@ cd backend && pytest --cov=app        # needs Postgres; see tests/conftest.py (T
 cd frontend && npm test && npm run type-check && npm run lint
 ```
 
+## Put it online
+
+See [DEPLOY.md](DEPLOY.md): one VPS, Caddy for automatic HTTPS, daily backups and a self-resetting
+demo school (`docker-compose.prod.yml`, `.env.production.example`).
+
 ## Known follow-ups (from the security review)
 
-Upload row caps · per-account login rate limit with a shared store · global LLM spend cap · CSV-safe template
-output · SQL-side report filtering · audit-log composite index (migration) · teacher read scope for analytics ·
-httpOnly refresh cookie. Verify `LLM_INPUT/OUTPUT_PRICE_PER_MTOK` against current OpenAI pricing.
+Done: upload row caps (`MAX_IMPORT_ROWS`), per-account login limit, server-wide LLM spend cap
+(`LLM_GLOBAL_MONTHLY_BUDGET_USD`), httpOnly refresh cookie, sign-up switch (`ALLOW_REGISTRATION`).
+
+Open: rate limits are in-memory (fine for one backend process; use a shared store before scaling out) ·
+CSV-safe template output · SQL-side report filtering · audit-log composite index (migration) · teacher read
+scope for analytics. Re-check `LLM_INPUT/OUTPUT_PRICE_PER_MTOK` if `OPENAI_MODEL` changes.

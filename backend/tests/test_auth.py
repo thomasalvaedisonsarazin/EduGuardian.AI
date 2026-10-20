@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.jwt import create_access_token, hash_refresh_token
 from app.auth.passwords import hash_password, verify_password
-from app.auth.rate_limit import auth_rate_limiter
+from app.auth.rate_limit import auth_rate_limiter, login_account_limiter
 from app.models import AuditLog, Membership, MembershipRole, RefreshToken, School, User
 
 PASSWORD = "s3cret-pass"
@@ -22,8 +22,10 @@ _seq = itertools.count(1)
 @pytest.fixture(autouse=True)
 def _reset_rate_limit() -> Iterator[None]:
     auth_rate_limiter.reset()
+    login_account_limiter.reset()
     yield
     auth_rate_limiter.reset()
+    login_account_limiter.reset()
 
 
 def _email() -> str:
@@ -364,6 +366,7 @@ def test_login_rate_limited(client: TestClient) -> None:
     assert blocked.status_code == 429
     assert blocked.json()["error"]["code"] == "RATE_LIMITED"
     auth_rate_limiter.reset()
+    login_account_limiter.reset()
     assert client.post("/api/v1/auth/login", json=payload).status_code == 401
 
 

@@ -18,7 +18,7 @@ describe('api client', () => {
   })
 
   it('adds Authorization and X-School-Id headers', async () => {
-    setTokens({ access_token: 'tok', refresh_token: 'ref' })
+    setTokens({ access_token: 'tok' })
     setActiveSchoolId(42)
     let seen: AxiosHeaders | undefined
     const adapter: AxiosAdapter = (config) => {

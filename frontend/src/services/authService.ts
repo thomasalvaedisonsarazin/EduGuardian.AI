@@ -22,8 +22,9 @@ export const authService = {
     return data
   },
 
-  async logout(refreshToken: string): Promise<void> {
-    await api.post('/auth/logout', { refresh_token: refreshToken })
+  /** Revokes the refresh cookie's token server-side and clears the cookie. */
+  async logout(): Promise<void> {
+    await api.post('/auth/logout')
   },
 
   async getMe(): Promise<AuthUser> {

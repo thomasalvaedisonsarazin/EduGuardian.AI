@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { useActiveSchoolId, useHasSession } from '@/hooks/useSession'
-import { clearSession, getActiveSchoolId, getRefreshToken, setActiveSchoolId, setTokens } from '@/lib/storage'
+import { clearSession, getActiveSchoolId, setActiveSchoolId, setTokens } from '@/lib/storage'
 import { authService } from '@/services/authService'
 import type { ID, LoginRequest, TokenPair } from '@/types'
 import type { AuthStatus, AuthUser, RegisterPayload } from '@/types/auth'
@@ -67,13 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(async () => {
-    const refreshToken = getRefreshToken()
-    if (refreshToken) {
-      try {
-        await authService.logout(refreshToken)
-      } catch {
-        /* the session is cleared locally regardless */
-      }
+    try {
+      await authService.logout()
+    } catch {
+      /* the session is cleared locally regardless */
     }
     clearSession()
     queryClient.clear()

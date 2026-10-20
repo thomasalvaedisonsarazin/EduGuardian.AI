@@ -39,7 +39,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("%s shutting down", settings.APP_NAME)
 
 
-app = FastAPI(title=settings.APP_NAME, version=__version__, lifespan=lifespan)
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=__version__,
+    lifespan=lifespan,
+    # Interactive API docs are a development aid; don't advertise the API surface publicly.
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
